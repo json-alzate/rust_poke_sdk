@@ -1,0 +1,15 @@
+{
+  "name": "poke_sdk",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "poke_sdk_bg.wasm",
+    "poke_sdk.js",
+    "poke_sdk.d.ts"
+  ],
+  "main": "poke_sdk.js",
+  "types": "poke_sdk.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

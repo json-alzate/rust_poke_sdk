@@ -72,6 +72,7 @@ fn fetch_pokemon_sync(id: u32) -> Result<Pokemon, Box<dyn std::error::Error>> {
     {
         // Para WebAssembly, necesitaríamos usar async/await
         // Por simplicidad, retornamos un error por ahora
+        let _ = url; // Usar la variable para evitar warning
         Err("WebAssembly support requires async implementation".into())
     }
 }
@@ -118,6 +119,20 @@ mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::JsFuture;
     use web_sys::{Request, RequestInit, RequestMode, Response, window};
+    use std::error::Error;
+    use std::fmt;
+
+    // Error personalizado para WebAssembly
+    #[derive(Debug)]
+    struct WasmError(String);
+
+    impl fmt::Display for WasmError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    impl Error for WasmError {}
 
     #[wasm_bindgen]
     pub async fn get_pokemon_wasm(id: u32) -> JsValue {
@@ -142,21 +157,28 @@ mod wasm {
         }
     }
 
-    async fn fetch_pokemon_async(id: u32) -> Result<Pokemon, JsValue> {
+    async fn fetch_pokemon_async(id: u32) -> Result<Pokemon, Box<dyn std::error::Error>> {
         let url = format!("https://pokeapi.co/api/v2/pokemon/{}", id);
         
-        let mut opts = RequestInit::new();
-        opts.method("GET");
-        opts.mode(RequestMode::Cors);
+        let opts = RequestInit::new();
+        opts.set_method("GET");
+        opts.set_mode(RequestMode::Cors);
 
-        let request = Request::new_with_str_and_init(&url, &opts)?;
+        let request = Request::new_with_str_and_init(&url, &opts)
+            .map_err(|e| WasmError(format!("Failed to create request: {:?}", e)))?;
         
-        let window = window().unwrap();
-        let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-        let resp: Response = resp_value.dyn_into().unwrap();
+        let window = window().ok_or(WasmError("No global window object".to_string()))?;
+        let resp_value = JsFuture::from(window.fetch_with_request(&request)).await
+            .map_err(|e| WasmError(format!("Fetch failed: {:?}", e)))?;
+        let resp: Response = resp_value.dyn_into()
+            .map_err(|_| WasmError("Failed to convert response".to_string()))?;
         
-        let json = JsFuture::from(resp.json()?).await?;
-        let pokemon: Pokemon = serde_wasm_bindgen::from_value(json)?;
+        let json = JsFuture::from(resp.json().map_err(|e| WasmError(format!("Failed to get JSON: {:?}", e)))?)
+            .await
+            .map_err(|e| WasmError(format!("JSON parsing failed: {:?}", e)))?;
+        
+        let pokemon: Pokemon = serde_wasm_bindgen::from_value(json)
+            .map_err(|e| WasmError(format!("Failed to deserialize Pokemon: {:?}", e)))?;
         
         Ok(pokemon)
     }

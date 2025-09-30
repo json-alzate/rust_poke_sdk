@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokémon SDK WebAssembly Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        .pokemon-card {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            backdrop-filter: blur(5px);
+        }
+        .pokemon-image {
+            max-width: 200px;
+            height: auto;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            padding: 10px;
+        }
+        .error {
+            color: #ff6b6b;
+            background-color: rgba(255, 107, 107, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ff6b6b;
+        }
+        .loading {
+            color: #4ecdc4;
+            background-color: rgba(78, 205, 196, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #4ecdc4;
+        }
+        .success {
+            color: #95e1d3;
+            background-color: rgba(149, 225, 211, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #95e1d3;
+        }
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 8px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        input {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            margin: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 16px;
+        }
+        .pokemon-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .types {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .type-badge {
+            background: rgba(255, 255, 255, 0.3);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Pokémon SDK WebAssembly Demo</h1>
+        <p>Demostración del SDK de Pokémon compilado a WebAssembly</p>
+        
+        <div>
+            <input type="number" id="pokemonId" placeholder="ID del Pokémon (1-1010)" min="1" max="1010" value="25">
+            <button id="getPokemonBtn" onclick="fetchPokemon()">Obtener Pokémon</button>
+            <button onclick="getRandomPokemon()">Pokémon Aleatorio</button>
+        </div>
+        
+        <div id="status"></div>
+        <div id="pokemonContainer"></div>
+    </div>
+
+    <script type="module">
+        import init, { get_pokemon_wasm } from './dist/wasm/poke_sdk.js';
+        
+        class PokemonApp {
+            constructor() {
+                this.initialized = false;
+                this.init();
+            }
+            
+            async init() {
+                try {
+                    await init();
+                    this.initialized = true;
+                    this.showStatus('✅ SDK WebAssembly inicializado correctamente', 'success');
+                } catch (error) {
+                    this.showStatus(`❌ Error al inicializar SDK: ${error.message}`, 'error');
+                    console.error('Init error:', error);
+                }
+            }
+            
+            async getPokemon(id) {
+                if (!this.initialized) {
+                    this.showStatus('🔄 Inicializando SDK...', 'loading');
+                    await this.init();
+                }
+                
+                this.showStatus('🔍 Obteniendo Pokémon...', 'loading');
+                
+                try {
+                    console.log(`Fetching Pokemon with ID: ${id}`);
+                    const result = await get_pokemon_wasm(id);
+                    console.log('WASM result:', result);
+                    
+                    if (result.success) {
+                        this.displayPokemon(result.pokemon);
+                        this.showStatus('✅ Pokémon obtenido exitosamente', 'success');
+                    } else {
+                        this.showStatus(`❌ Error: ${result.error}`, 'error');
+                    }
+                    
+                    return result;
+                } catch (error) {
+                    console.error('Error calling WASM:', error);
+                    this.showStatus(`💥 Error inesperado: ${error.message}`, 'error');
+                    return {
+                        success: false,
+                        pokemon: null,
+                        error: error.message
+                    };
+                }
+            }
+            
+            displayPokemon(pokemon) {
+                const container = document.getElementById('pokemonContainer');
+                
+                const types = pokemon.types ? pokemon.types.map(t => t.type.name).join(', ') : 'Desconocido';
+                
+                container.innerHTML = `
+                    <div class="pokemon-card">
+                        <h2>#${pokemon.id} - ${pokemon.name.charAt(0).toUpperCase() + pokemon.name.slice(1)}</h2>
+                        <div style="display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap;">
+                            <div>
+                                ${pokemon.sprites && pokemon.sprites.front_default ? 
+                                    `<img src="${pokemon.sprites.front_default}" alt="${pokemon.name}" class="pokemon-image">` : 
+                                    '<div style="width: 200px; height: 200px; background: rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center;">Sin imagen</div>'
+                                }
+                            </div>
+                            <div style="flex: 1; min-width: 300px;">
+                                <div class="pokemon-stats">
+                                    <div class="stat-item">
+                                        <strong>Altura:</strong> ${pokemon.height / 10} m
+                                    </div>
+                                    <div class="stat-item">
+                                        <strong>Peso:</strong> ${pokemon.weight / 10} kg
+                                    </div>
+                                    ${pokemon.base_experience ? 
+                                        `<div class="stat-item"><strong>Experiencia Base:</strong> ${pokemon.base_experience}</div>` : 
+                                        ''
+                                    }
+                                </div>
+                                <div style="margin-top: 20px;">
+                                    <strong>Tipos:</strong>
+                                    <div class="types">
+                                        ${pokemon.types ? pokemon.types.map(t => 
+                                            `<span class="type-badge">${t.type.name}</span>`
+                                        ).join('') : '<span class="type-badge">Desconocido</span>'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            showStatus(message, type) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.className = type;
+                statusDiv.textContent = message;
+                
+                if (type === 'loading') {
+                    document.getElementById('getPokemonBtn').disabled = true;
+                } else {
+                    document.getElementById('getPokemonBtn').disabled = false;
+                }
+            }
+            
+            getRandomId() {
+                return Math.floor(Math.random() * 1010) + 1;
+            }
+        }
+        
+        // Crear instancia global
+        const app = new PokemonApp();
+        
+        // Funciones globales para los botones
+        window.fetchPokemon = async function() {
+            const id = parseInt(document.getElementById('pokemonId').value);
+            if (id < 1 || id > 1010 || isNaN(id)) {
+                app.showStatus('⚠️ Por favor, ingresa un ID válido (1-1010)', 'error');
+                return;
+            }
+            await app.getPokemon(id);
+        };
+        
+        window.getRandomPokemon = async function() {
+            const randomId = app.getRandomId();
+            document.getElementById('pokemonId').value = randomId;
+            await app.getPokemon(randomId);
+        };
+        
+        // Cargar Pokémon inicial al cargar la página
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                console.log('Loading initial Pokemon...');
+                fetchPokemon();
+            }, 2000);
+        });
+        
+        // Permitir Enter en el input
+        document.getElementById('pokemonId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchPokemon();
+            }
+        });
+    </script>
+</body>
+</html>
