@@ -1,0 +1,27 @@
+[package]
+name = "poke_sdk"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "poke_sdk"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["blocking", "json", "rustls-tls"], default-features = false }
+libc = "0.2"
+cfg-if = "1.0"
+
+# dependencias sólo para compilación a wasm
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Window", "Response", "Request", "RequestInit", "RequestMode"] }
+js-sys = "0.3"
+serde-wasm-bindgen = "0.4"
+
+# Para compilación nativa (Android/iOS)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.0", features = ["full"], optional = true }
