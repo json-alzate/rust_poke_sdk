@@ -6,6 +6,80 @@ set -e
 
 echo "🚀 Compilando Pokémon SDK para múltiples plataformas..."
 
+# Función para verificar y configurar Android NDK
+check_android_ndk() {
+    echo "🔍 Verificando Android NDK..."
+    
+    # Buscar Android NDK en ubicaciones comunes
+    NDK_PATHS=(
+        "$ANDROID_NDK_HOME"
+        "$ANDROID_HOME/ndk-bundle"
+        "$HOME/Android/Sdk/ndk-bundle"
+        "$HOME/Android/Sdk/ndk/"*
+        "/opt/android-ndk"
+        "/usr/local/android-ndk"
+    )
+    
+    for ndk_path in "${NDK_PATHS[@]}"; do
+        # Expandir globs
+        for expanded_path in $ndk_path; do
+            if [ -d "$expanded_path" ] && [ -f "$expanded_path/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang" ]; then
+                export ANDROID_NDK_HOME="$expanded_path"
+                export NDK_HOME="$expanded_path"
+                echo "✅ Android NDK encontrado en: $expanded_path"
+                return 0
+            fi
+        done
+    done
+    
+    echo "❌ Android NDK no encontrado."
+    echo "📥 Por favor instala Android NDK:"
+    echo "   1. Instalar via Android Studio SDK Manager"
+    echo "   2. O descargar desde: https://developer.android.com/ndk/downloads"
+    echo "   3. Configurar ANDROID_NDK_HOME variable de entorno"
+    echo ""
+    echo "💡 Ejemplo de configuración:"
+    echo "   export ANDROID_NDK_HOME=/path/to/android-ndk-r25c"
+    echo "   export PATH=\$PATH:\$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+    return 1
+}
+
+# Función para configurar variables de entorno de Android
+setup_android_env() {
+    if [ -z "$ANDROID_NDK_HOME" ]; then
+        echo "❌ ANDROID_NDK_HOME no está configurado"
+        return 1
+    fi
+    
+    export NDK_HOME="$ANDROID_NDK_HOME"
+    export TOOLCHAIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+    export PATH="$PATH:$TOOLCHAIN/bin"
+    
+    # Configurar linkers para cada arquitectura
+    export CC_aarch64_linux_android="$TOOLCHAIN/bin/aarch64-linux-android21-clang"
+    export CXX_aarch64_linux_android="$TOOLCHAIN/bin/aarch64-linux-android21-clang++"
+    export AR_aarch64_linux_android="$TOOLCHAIN/bin/llvm-ar"
+    export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/aarch64-linux-android21-clang"
+    
+    export CC_armv7_linux_androideabi="$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang"
+    export CXX_armv7_linux_androideabi="$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang++"
+    export AR_armv7_linux_androideabi="$TOOLCHAIN/bin/llvm-ar"
+    export CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang"
+    
+    export CC_i686_linux_android="$TOOLCHAIN/bin/i686-linux-android21-clang"
+    export CXX_i686_linux_android="$TOOLCHAIN/bin/i686-linux-android21-clang++"
+    export AR_i686_linux_android="$TOOLCHAIN/bin/llvm-ar"
+    export CARGO_TARGET_I686_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/i686-linux-android21-clang"
+    
+    export CC_x86_64_linux_android="$TOOLCHAIN/bin/x86_64-linux-android21-clang"
+    export CXX_x86_64_linux_android="$TOOLCHAIN/bin/x86_64-linux-android21-clang++"
+    export AR_x86_64_linux_android="$TOOLCHAIN/bin/llvm-ar"
+    export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/x86_64-linux-android21-clang"
+    
+    echo "✅ Variables de entorno de Android configuradas"
+    return 0
+}
+
 # Función para mostrar ayuda
 show_help() {
     echo "Uso: $0 [android|ios|wasm|all|clean]"
@@ -25,6 +99,7 @@ clean() {
     cargo clean
     rm -rf target/
     rm -rf pkg/
+    rm -rf dist/
     echo "✅ Limpieza completada"
 }
 
@@ -32,7 +107,20 @@ clean() {
 build_android() {
     echo "🤖 Compilando para Android..."
     
+    # Verificar y configurar Android NDK
+    if ! check_android_ndk; then
+        echo "❌ No se puede compilar para Android sin NDK"
+        echo "💡 Consulta ANDROID_SETUP.md para instrucciones detalladas"
+        return 1
+    fi
+    
+    if ! setup_android_env; then
+        echo "❌ Error configurando entorno de Android"
+        return 1
+    fi
+    
     # Instalar targets si no están instalados
+    echo "📦 Instalando targets de Android..."
     rustup target add aarch64-linux-android
     rustup target add armv7-linux-androideabi
     rustup target add i686-linux-android

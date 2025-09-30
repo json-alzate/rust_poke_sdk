@@ -224,7 +224,7 @@ export function get_pokemon_wasm(id) {
     return ret;
 }
 
-function __wbg_adapter_10(arg0, arg1, arg2) {
+function __wbg_adapter_8(arg0, arg1, arg2) {
     wasm.closure40_externref_shim(arg0, arg1, arg2);
 }
 
@@ -538,7 +538,7 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbindgen_cast_90fb09e08acc4555 = function(arg0, arg1) {
         // Cast intrinsic for `Closure(Closure { dtor_idx: 39, function: Function { arguments: [Externref], shim_idx: 40, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, 39, __wbg_adapter_10);
+        const ret = makeMutClosure(arg0, arg1, 39, __wbg_adapter_8);
         return ret;
     };
     imports.wbg.__wbindgen_cast_d6cd19b81560fd6e = function(arg0) {
