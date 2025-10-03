@@ -6,8 +6,8 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly get_pokemon_json: (a: number) => number;
-  readonly free_string: (a: number) => void;
+  readonly getPokemonJson: (a: number) => number;
+  readonly freeString: (a: number) => void;
   readonly get_pokemon_wasm: (a: number) => any;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __externref_table_alloc: () => number;

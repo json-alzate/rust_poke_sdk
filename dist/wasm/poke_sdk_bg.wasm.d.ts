@@ -1,8 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
-export const get_pokemon_json: (a: number) => number;
-export const free_string: (a: number) => void;
+export const getPokemonJson: (a: number) => number;
+export const freeString: (a: number) => void;
 export const get_pokemon_wasm: (a: number) => any;
 export const __wbindgen_exn_store: (a: number) => void;
 export const __externref_table_alloc: () => number;

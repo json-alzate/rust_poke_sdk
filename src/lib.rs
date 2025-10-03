@@ -80,7 +80,23 @@ fn fetch_pokemon_sync(id: u32) -> Result<Pokemon, Box<dyn std::error::Error>> {
 // Función para Android/iOS que retorna un JSON string
 // Esta función será llamada desde el código nativo
 #[no_mangle]
-pub extern "C" fn get_pokemon_json(id: u32) -> *mut c_char {
+pub extern "C" fn getPokemonJson(id: u32) -> *mut c_char {
+    // Validar entrada
+    if id == 0 || id > 1025 {
+        let error_result = PokemonResult {
+            success: false,
+            pokemon: None,
+            error: Some(format!("Invalid Pokemon ID: {}. Must be between 1 and 1025.", id)),
+        };
+        let json_string = serde_json::to_string(&error_result).unwrap_or_else(|_| 
+            r#"{"success":false,"pokemon":null,"error":"Invalid ID and serialization error"}"#.to_string()
+        );
+        return match CString::new(json_string) {
+            Ok(c_string) => c_string.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        };
+    }
+
     let result = get_pokemon(id);
     let json_string = match serde_json::to_string(&result) {
         Ok(json) => json,
@@ -98,13 +114,17 @@ pub extern "C" fn get_pokemon_json(id: u32) -> *mut c_char {
     
     match CString::new(json_string) {
         Ok(c_string) => c_string.into_raw(),
-        Err(_) => std::ptr::null_mut(),
+        Err(_) => {
+            // Si no podemos crear el CString, retornar un error básico
+            let fallback = CString::new(r#"{"success":false,"pokemon":null,"error":"CString creation failed"}"#).unwrap();
+            fallback.into_raw()
+        }
     }
 }
 
 // Función para liberar memoria (importante para evitar memory leaks)
 #[no_mangle]
-pub extern "C" fn free_string(ptr: *mut c_char) {
+pub extern "C" fn freeString(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
             let _ = CString::from_raw(ptr);
@@ -236,5 +256,30 @@ mod tests {
 
         let json = serde_json::to_string(&result);
         assert!(json.is_ok());
+    }
+}
+
+// Funciones JNI específicas para Android - Top-level functions (más simples)
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_example_androidxerpatestsdk_pokemon_PokemonSDKKt_pokemonSdkGetJson(
+    _env: *mut std::os::raw::c_void,
+    _class: *mut std::os::raw::c_void,
+    id: std::os::raw::c_int,
+) -> *mut c_char {
+    // Llamar a la función original que hace la petición HTTP real
+    getPokemonJson(id as u32)
+}
+
+// Función JNI para liberar memoria - CRÍTICA para evitar memory leaks
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_example_androidxerpatestsdk_pokemon_PokemonSDKKt_pokemonSdkFreeString(
+    _env: *mut std::os::raw::c_void,
+    _class: *mut std::os::raw::c_void,
+    ptr: std::os::raw::c_long,
+) {
+    if ptr != 0 {
+        freeString(ptr as *mut c_char);
     }
 }
